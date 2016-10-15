@@ -1,3 +1,4 @@
+#include <limits.h>
 #include "ServerData.h"
 
 #include "WorldMap.h"
@@ -268,6 +269,72 @@ void WorldMap::reassignRegion( Region* r, int new_layout )
 
 void WorldMap::balance_lightest()
 {
+	int i = 0;
+	int j = 0;	
+
+	int heaviest = -1;
+	int lightest = -1;
+
+	int maxPlayersInNode = 0;
+	int minPlayersInNode = INT_MAX;
+
+	int numOfPlayers = 0;
+
+	double avgPlayersPerThread = (double)n_players / sd->num_threads;
+
+	for (i = 0; i < sd->num_threads; i++) 
+	{
+		printf("Number of players in thread %d before balancing: %d\n", i, players[i].size());
+
+		numOfPlayers = players[i].size();
+		
+		if ( (numOfPlayers / avgPlayersPerThread > sd->overloaded_level) && numOfPlayers > maxPlayersInNode) 
+		{
+			maxPlayersInNode = numOfPlayers;
+			heaviest = i;	
+		} 
+		else if ( (numOfPlayers / avgPlayersPerThread < sd->light_level) && numOfPlayers < minPlayersInNode)
+		{
+			minPlayersInNode = numOfPlayers;
+			lightest = i;
+		} 
+	}
+
+	if (heaviest == -1 || lightest == -1)
+		return;
+
+	printf("\n");
+	printf("heaviest: %d, lightest: %d\n", heaviest, lightest);
+	printf("\n");
+
+	int totalPlayersMoved = 0;
+	int maxPlayersCanBeMoved = (int)avgPlayersPerThread - minPlayersInNode;
+
+	if (maxPlayersCanBeMoved < 1)
+		return;
+
+	Region* tmpRegion;
+	for (i = 0; i < n_regs.x; i++)
+	{
+		for (j = 0; j < n_regs.y; j++)
+		{
+			tmpRegion = &regions[i][j];
+
+			if (tmpRegion->layout == heaviest)
+				printf("Number of players in region[%d][%d]: %d\n", i, j, tmpRegion->n_pls);
+
+			if (tmpRegion->layout == heaviest && tmpRegion->n_pls != 0 && (totalPlayersMoved + tmpRegion->n_pls <= maxPlayersCanBeMoved) )
+			{
+				totalPlayersMoved += tmpRegion->n_pls;
+				reassignRegion(tmpRegion, lightest);
+			}
+		}
+	}
+
+	for (i = 0; i < sd->num_threads; i++)
+	{
+		printf("Number of players in thread %d after balancing: %d\n", i, players[i].size());
+	}
 }
 
 void WorldMap::balance_spread()
