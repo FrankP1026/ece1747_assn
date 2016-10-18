@@ -35,6 +35,13 @@ WorldUpdateModule::WorldUpdateModule( int id, MessageModule *_comm, SDL_barrier 
 	
 	avg_wui = -1;
 	avg_rui = -1;
+
+	avg_client_req_no_quest = -1;
+	avg_client_req_with_quest = -1;
+	avg_client_upd_no_quest = -1;
+	avg_client_upd_with_quest = -1;
+
+	in_quest = false;
 	
 	assert( SDL_CreateThread( module_thread, (void*)this ) != NULL );
 }
@@ -48,8 +55,12 @@ WorldUpdateModule::WorldUpdateModule( int id, MessageModule *_comm, SDL_barrier 
 void WorldUpdateModule::run()
 {
 	Uint32 start_time;
+	Uint32 client_req_start_time;
     Uint32 timeout;
-    Uint32 wui, rui;
+    Uint32 wui, rqi, rui;  // rqi: request updating interval
+
+	Uint32 num_client_req;
+	Uint32 num_client_upd;
     
 	Message *m;
 	IPaddress addr;
@@ -69,11 +80,19 @@ void WorldUpdateModule::run()
 	/* main loop */
 	while ( true )
 	{
+		num_client_req = 0;
+		num_client_upd = 0;
+
+		rqi = 0;	
+
 		start_time = SDL_GetTicks();
 		timeout	= sd->regular_update_interval;
 		
         while( (m = comm->receive( timeout, t_id )) != NULL )
         {
+			num_client_req++;
+			client_req_start_time = SDL_GetTicks();			
+
             addr = m->getAddress();
             type = m->getType();
             p = sd->wm.findPlayer( addr, t_id );
@@ -103,7 +122,16 @@ void WorldUpdateModule::run()
             delete m;
             timeout = sd->regular_update_interval - (SDL_GetTicks() - start_time);
             if( ((int)timeout) < 0 )	timeout = 0;
+
+			rqi += SDL_GetTicks() - client_req_start_time;
         }
+
+		if (in_quest) {
+			avg_client_req_with_quest = (avg_client_req_with_quest < 0) ? rqi : avg_client_req_with_quest * 0.95 + (double)rqi * 0.05; 
+		}
+		else {
+			avg_client_req_no_quest = (avg_client_req_no_quest < 0) ? rqi : avg_client_req_no_quest * 0.95 + (double)rqi * 0.05; 
+		}
         
         SDL_WaitBarrier(barrier);
         
@@ -136,11 +164,15 @@ void WorldUpdateModule::run()
         wui = SDL_GetTicks() - start_time;
         avg_wui = ( avg_wui < 0 ) ? wui : ( avg_wui * 0.95 + (double)wui * 0.05 );        
         start_time = SDL_GetTicks();
+
+		num_client_upd = 0;
         
 		/* send updates to clients (map state) */
 	    bucket->start();
 	    while ( ( p = bucket->next() ) != NULL )
 	    {
+			num_client_upd++;
+
 	    	ms = new MessageWithSerializator( MESSAGE_SC_REGULAR_UPDATE, t_id, p->address );	assert(ms);
 		    s = ms->getSerializator();															assert(s);
 		    
@@ -149,13 +181,36 @@ void WorldUpdateModule::run()
 	    	ms->prepare();
 	    	comm->send( ms, t_id );
 	    	
-	    	if( sd->send_start_quest )		comm->send( new MessageXY(MESSAGE_SC_NEW_QUEST, t_id, p->address, sd->quest_pos), t_id );
-	    	if( sd->send_end_quest )		comm->send( new Message(MESSAGE_SC_QUEST_OVER, t_id, p->address), t_id );
+	    	if( sd->send_start_quest ) {
+				comm->send( new MessageXY(MESSAGE_SC_NEW_QUEST, t_id, p->address, sd->quest_pos), t_id );
+				num_client_upd++;
+			}
+
+	    	if( sd->send_end_quest ) {
+				comm->send( new Message(MESSAGE_SC_QUEST_OVER, t_id, p->address), t_id );
+				num_client_upd++;
+			}
 	    }
+
+		rui = SDL_GetTicks() - start_time;    
+	    //avg_rui = ( avg_rui < 0 ) ? rui : ( avg_rui * 0.95 + (double)rui * 0.05 );
+
+		if (in_quest) {
+					
+		}
+		else {
+		
+		}
+
+    	if( sd->send_start_quest ) {
+			in_quest = true;
+		}
+
+    	if( sd->send_end_quest ) {
+			in_quest = false;
+		}	
 	
-	    SDL_WaitBarrier(barrier);
-	    rui = SDL_GetTicks() - start_time;    
-	    avg_rui = ( avg_rui < 0 ) ? rui : ( avg_rui * 0.95 + (double)rui * 0.05 );	    
+	    SDL_WaitBarrier(barrier);    
 	}
 }
 

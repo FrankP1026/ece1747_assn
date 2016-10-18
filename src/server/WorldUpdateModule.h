@@ -39,6 +39,12 @@ public:
 	double avg_wui;			// average_world_update_interval
 	double avg_rui;			// average_regular_update_interval
 
+	double avg_client_req_no_quest;
+	double avg_client_req_with_quest;
+	double avg_client_upd_no_quest;
+	double avg_client_upd_with_quest;
+
+	bool in_quest;
 
 public:
 	/* Constructor and setup methods */
