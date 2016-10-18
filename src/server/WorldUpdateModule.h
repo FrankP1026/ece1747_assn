@@ -51,6 +51,9 @@ public:
 
 	bool in_quest;
 
+	Uint32 last_req_print;
+	Uint32 last_upd_print;
+
 public:
 	/* Constructor and setup methods */
 	WorldUpdateModule( int id, MessageModule *_comm, SDL_barrier *_barr );

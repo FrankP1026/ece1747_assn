@@ -59,6 +59,8 @@ WorldUpdateModule::WorldUpdateModule( int id, MessageModule *_comm, SDL_barrier 
 
 void WorldUpdateModule::run()
 {
+	const Uint32 print_stats_interval = 2000;
+
 	Uint32 start_time;
 	Uint32 client_req_start_time;
     Uint32 timeout;
@@ -86,7 +88,6 @@ void WorldUpdateModule::run()
 	while ( true )
 	{
 		num_client_req = 0;
-		num_client_upd = 0;
 
 		rqi = 0;	
 
@@ -131,23 +132,31 @@ void WorldUpdateModule::run()
 			rqi += SDL_GetTicks() - client_req_start_time;
         }
 
-		if (num_client_req) {
-			if (in_quest) {
+			
+		bool print_stat = false;
+		Uint32 now = SDL_GetTicks();
+		if (now - last_req_print > print_stats_interval) {
+			last_req_print = now;
+			print_stat = true;
+		}
 
-				avg_client_req_num_with_quest = (avg_client_req_num_with_quest < 0) ? num_client_req : avg_client_req_num_with_quest * 0.95 + (double)num_client_req * 0.05;
+		if (in_quest) {
 
-				avg_client_req_interval_with_quest = (avg_client_req_interval_with_quest < 0) ? rqi : avg_client_req_interval_with_quest * 0.95 + (double)rqi * 0.05;
+			avg_client_req_num_with_quest = (avg_client_req_num_with_quest < 0) ? num_client_req : avg_client_req_num_with_quest * 0.95 + (double)num_client_req * 0.05;
 
-				printf("Thread %d, avg_client_req_num_with_quest: %lf, avg_client_req_interval_with_request: %lf\n", t_id, avg_client_req_num_with_quest, avg_client_req_interval_with_quest); 
-			}
-			else {
+			avg_client_req_interval_with_quest = (avg_client_req_interval_with_quest < 0) ? rqi : avg_client_req_interval_with_quest * 0.95 + (double)rqi * 0.05;
 
-				avg_client_req_num_no_quest = (avg_client_req_num_no_quest < 0) ? num_client_req : avg_client_req_num_no_quest * 0.95 + (double)num_client_req * 0.05;
+			if (print_stat)
+				printf("Thread %d, avg_client_req_num_with_quest: %lf, avg_client_req_interval_with_request: %lf\n", t_id, avg_client_req_num_with_quest, avg_client_req_interval_with_quest);
+		}
+		else {
 
-				avg_client_req_interval_no_quest = (avg_client_req_interval_no_quest < 0) ? rqi : avg_client_req_interval_no_quest * 0.95 + (double)rqi * 0.05;
+			avg_client_req_num_no_quest = (avg_client_req_num_no_quest < 0) ? num_client_req : avg_client_req_num_no_quest * 0.95 + (double)num_client_req * 0.05;
 
+			avg_client_req_interval_no_quest = (avg_client_req_interval_no_quest < 0) ? rqi : avg_client_req_interval_no_quest * 0.95 + (double)rqi * 0.05;
+
+			if (print_stat)
 				printf("Thread %d, avg_client_req_num_no_quest: %lf, avg_client_req_interval_no_request: %lf\n", t_id, avg_client_req_num_no_quest, avg_client_req_interval_no_quest);
-			}
 		}
         
         SDL_WaitBarrier(barrier);
