@@ -1,5 +1,5 @@
 #!/bin/sh
 for run in {1..100}
 do
-  ./client ug72@eecg.utoronto.ca:10000 &
+  ./client ug51.eecg.utoronto.ca:10000 &
 done

@@ -36,10 +36,15 @@ WorldUpdateModule::WorldUpdateModule( int id, MessageModule *_comm, SDL_barrier 
 	avg_wui = -1;
 	avg_rui = -1;
 
-	avg_client_req_no_quest = -1;
-	avg_client_req_with_quest = -1;
-	avg_client_upd_no_quest = -1;
-	avg_client_upd_with_quest = -1;
+	avg_client_req_num_no_quest = -1;
+	avg_client_req_num_with_quest = -1;
+	avg_client_upd_num_no_quest = -1;
+	avg_client_upd_num_with_quest = -1;
+
+	avg_client_req_interval_no_quest = -1;
+	avg_client_req_interval_with_quest = -1;
+	avg_client_upd_interval_no_quest = -1;
+	avg_client_upd_interval_with_quest = -1;
 
 	in_quest = false;
 	
@@ -126,11 +131,23 @@ void WorldUpdateModule::run()
 			rqi += SDL_GetTicks() - client_req_start_time;
         }
 
-		if (in_quest) {
-			avg_client_req_with_quest = (avg_client_req_with_quest < 0) ? rqi : avg_client_req_with_quest * 0.95 + (double)rqi * 0.05; 
-		}
-		else {
-			avg_client_req_no_quest = (avg_client_req_no_quest < 0) ? rqi : avg_client_req_no_quest * 0.95 + (double)rqi * 0.05; 
+		if (num_client_req) {
+			if (in_quest) {
+
+				avg_client_req_num_with_quest = (avg_client_req_num_with_quest < 0) ? num_client_req : avg_client_req_num_with_quest * 0.95 + (double)num_client_req * 0.05;
+
+				avg_client_req_interval_with_quest = (avg_client_req_interval_with_quest < 0) ? rqi : avg_client_req_interval_with_quest * 0.95 + (double)rqi * 0.05;
+
+				printf("Thread %d, avg_client_req_num_with_quest: %lf, avg_client_req_interval_with_request: %lf\n", t_id, avg_client_req_num_with_quest, avg_client_req_interval_with_quest); 
+			}
+			else {
+
+				avg_client_req_num_no_quest = (avg_client_req_num_no_quest < 0) ? num_client_req : avg_client_req_num_no_quest * 0.95 + (double)num_client_req * 0.05;
+
+				avg_client_req_interval_no_quest = (avg_client_req_interval_no_quest < 0) ? rqi : avg_client_req_interval_no_quest * 0.95 + (double)rqi * 0.05;
+
+				printf("Thread %d, avg_client_req_num_no_quest: %lf, avg_client_req_interval_no_request: %lf\n", t_id, avg_client_req_num_no_quest, avg_client_req_interval_no_quest);
+			}
 		}
         
         SDL_WaitBarrier(barrier);
@@ -160,12 +177,12 @@ void WorldUpdateModule::run()
         }
         
         SDL_WaitBarrier(barrier);
-        
+        		
+		num_client_upd = 0;
+
         wui = SDL_GetTicks() - start_time;
         avg_wui = ( avg_wui < 0 ) ? wui : ( avg_wui * 0.95 + (double)wui * 0.05 );        
         start_time = SDL_GetTicks();
-
-		num_client_upd = 0;
         
 		/* send updates to clients (map state) */
 	    bucket->start();
@@ -196,10 +213,10 @@ void WorldUpdateModule::run()
 	    //avg_rui = ( avg_rui < 0 ) ? rui : ( avg_rui * 0.95 + (double)rui * 0.05 );
 
 		if (in_quest) {
-					
+			avg_client_upd_interval_with_quest = (avg_client_upd_interval_with_quest < 0) ? rui : ( avg_client_upd_interval_with_quest * 0.95 + (double)rui * 0.05 );
 		}
 		else {
-		
+			avg_client_upd_interval_no_quest = (avg_client_upd_interval_no_quest < 0) ? rui : ( avg_client_upd_interval_no_quest * 0.95 + (double)rui * 0.05 );
 		}
 
     	if( sd->send_start_quest ) {
